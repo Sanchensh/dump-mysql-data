@@ -53,7 +53,7 @@ public class DumpService {
         Long maxId = loadData.getMaxId();
         Long minId = loadData.getMinId();
         Integer batchSize = loadData.getBatchSize();
-        int batch = (int) Math.ceil((double) (maxId - minId) / (double) batchSize);
+        int batch = (int) Math.ceil((double) (maxId - minId) / (double) batchSize) + 1;
         for (long i = 1; i <= batch; i++) {
             loadData.load((i - 1) * batchSize, i * batchSize, targetConnectConfig, producer);
         }
