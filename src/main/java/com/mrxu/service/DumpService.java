@@ -2,7 +2,6 @@ package com.mrxu.service;
 
 import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.dsl.Disruptor;
-import com.mrxu.datasource.DataSourceConfig;
 import com.mrxu.disruptor.event.DataEvent;
 import com.mrxu.disruptor.factory.DataEventFactory;
 import com.mrxu.disruptor.handler.DataEventHandler;
@@ -13,8 +12,6 @@ import com.mrxu.util.Utils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.sql.ResultSet;
-import java.util.List;
 import java.util.concurrent.*;
 
 /**
@@ -39,94 +36,35 @@ public class DumpService {
         ConnectConfig sourceConfig = connect.getSource();
         //导入数据的目标库的配置
         ConnectConfig targetConfig = connect.getTarget();
-        //导入数据的源库
-        DataSourceConfig sourceDataSource = new DataSourceConfig(sourceConfig);
-        //导入数据的目标库
-        DataSourceConfig targetDataSource = new DataSourceConfig(targetConfig);
         //获取disruptor队列
-        Disruptor<DataEvent> disruptor = initDisruptor(targetDataSource);
+        Disruptor<DataEvent> disruptor = initDisruptor(targetConfig);
         //开始job
-        loadDataJob(disruptor, sourceDataSource, targetDataSource);
+        loadDataJob(disruptor, sourceConfig, targetConfig);
     }
 
 
-    private void loadDataJob(Disruptor<DataEvent> disruptor, DataSourceConfig sourceDataSource, DataSourceConfig targetDataSource) {
+    private void loadDataJob(Disruptor<DataEvent> disruptor, ConnectConfig sourceConnectConfig, ConnectConfig targetConnectConfig) {
         disruptor.start();
         RingBuffer<DataEvent> ringBuffer = disruptor.getRingBuffer();
         //生产者
         DataEventProducer producer = new DataEventProducer(ringBuffer);
         //初始化需要同步数据库的信息
-        LoadDataFromDatabase loadData = new LoadDataFromDatabase(sourceDataSource);
+        LoadDataFromDatabase loadData = new LoadDataFromDatabase(sourceConnectConfig);
         Long maxId = loadData.getMaxId();
         Long minId = loadData.getMinId();
         Integer batchSize = loadData.getBatchSize();
         int batch = (int) Math.ceil((double) (maxId - minId) / (double) batchSize);
-        CountDownLatch latch = new CountDownLatch(batch);
         for (long i = 1; i <= batch; i++) {
-            long finalI = i;
-            JobService.submit(() -> job(producer, loadData, targetDataSource.getConfig(), finalI, batchSize, latch));
-        }
-        try {
-            latch.await();
-        } catch (InterruptedException e) {
-            log.error("InterruptedException ", e);
+            loadData.load((i - 1) * batchSize, i * batchSize, targetConnectConfig, producer);
         }
         disruptor.shutdown();
-        sourceDataSource.getDataSource().close();
-        targetDataSource.getDataSource().close();
     }
 
-    private void job(DataEventProducer producer, LoadDataFromDatabase loadData, ConnectConfig targetConfig, long i, int batchSize, CountDownLatch latch) {
-        try {
-            ResultSet resultSet = loadData.load((i - 1) * batchSize, i * batchSize);
-            List<String> fields = targetConfig.getFields();
-            while (resultSet.next()) {
-                StringBuilder sb = new StringBuilder();
-                for (int j = 0; j < fields.size(); j++) {
-                    Object object = resultSet.getObject(fields.get(j));
-                    sb.append(object);
-                    if (j != fields.size() - 1) {
-                        sb.append("\t");
-                    }
-                }
-                producer.onData(sb.toString());
-            }
-        } catch (Exception e) {
-            log.error("Exception while loading data, error message: ", e);
-        } finally {
-            latch.countDown();
-        }
-    }
-
-    private Disruptor<DataEvent> initDisruptor(DataSourceConfig targetDataSource) {
+    private Disruptor<DataEvent> initDisruptor(ConnectConfig targetConnectConfig) {
         DataEventFactory factory = new DataEventFactory();
-        Disruptor<DataEvent> disruptor = new Disruptor<>(factory, Utils.getBatchSize(targetDataSource.getConfig().getBatchSize()), Executors.defaultThreadFactory());
-        disruptor.handleEventsWith(new DataEventHandler(targetDataSource));
+        Disruptor<DataEvent> disruptor = new Disruptor<>(factory, Utils.getBatchSize(targetConnectConfig.getBatchSize()), Executors.defaultThreadFactory());
+        disruptor.handleEventsWith(new DataEventHandler(targetConnectConfig));
         return disruptor;
     }
-
-//    public static void main(String[] args) {
-//        for (int i = 0; i < 100; i++) {
-//            service.submit(() -> {
-//                System.out.println("hello");
-//                try {
-//                    TimeUnit.SECONDS.sleep(10);
-//                } catch (InterruptedException e) {
-//                    e.printStackTrace();
-//                }
-//            });
-//        }
-//    }
-
-//    public static void main(String[] args) {
-//        Long maxId = 101L;
-//        Long minId =  0L;
-//        Integer batchSize = 10;
-//
-//        int batch = (int) Math.ceil((double) (maxId - minId) / (double) batchSize);
-//        for (long i = 1; i <= batch; i++) {
-//            System.out.println(i * batchSize);
-//        }
-//    }
 
 }

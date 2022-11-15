@@ -1,8 +1,8 @@
 package com.mrxu.disruptor.handler;
 
 import com.lmax.disruptor.EventHandler;
-import com.mrxu.datasource.DataSourceConfig;
 import com.mrxu.disruptor.event.DataEvent;
+import com.mrxu.mysql.ConnectConfig;
 import com.mrxu.service.DumpDataToDatabase;
 import com.mrxu.util.Utils;
 import lombok.extern.slf4j.Slf4j;
@@ -23,8 +23,8 @@ public class DataEventHandler implements EventHandler<DataEvent> {
     private AtomicLong total;
     private AtomicLong success;
 
-    public DataEventHandler(DataSourceConfig targetDataSource) {
-        this.dumpData = new DumpDataToDatabase(targetDataSource);
+    public DataEventHandler(ConnectConfig targetConnectConfig) {
+        this.dumpData = new DumpDataToDatabase(targetConnectConfig);
         this.total = new AtomicLong(0);
         this.success = new AtomicLong(0);
         this.cache = new StringBuffer();
@@ -38,7 +38,7 @@ public class DataEventHandler implements EventHandler<DataEvent> {
         if (endOfBatch) {
             int i = dumpData.loadLocalFile(Utils.getDataStream(cache));
             long s = success.addAndGet(i);
-            cache = new StringBuffer();
+            cache.delete(0, cache.length());
             log.info("load data total: " + cnt);
             log.info("load data success: " + s);
             return;

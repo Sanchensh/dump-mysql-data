@@ -17,8 +17,11 @@ public class Utils {
     }
 
     public static int getBatchSize(int cap) {
-        int n = -1 >>> Integer.numberOfLeadingZeros(cap - 1);
-        return (n < 0) ? 1 : (n >= MAXIMUM_CAPACITY) ? MAXIMUM_CAPACITY : n + 1;
+        int size = 2;
+        while (size <= cap){
+            size <<= 1;
+        }
+        return size;
     }
 
     public static String getFieldStr(List<String> fields) {
