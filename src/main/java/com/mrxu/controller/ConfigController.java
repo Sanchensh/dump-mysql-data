@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Objects;
+
 @RestController
 public class ConfigController {
 
@@ -26,27 +28,41 @@ public class ConfigController {
     private void check(Connect connect) throws IllegalArgumentException {
         check(connect.getSource());
         check(connect.getTarget());
+        if (Objects.isNull(connect.getSource().getMinId())) {
+            throw new IllegalArgumentException("Source MySQL minId can not be null");
+        }
+        if (Objects.isNull(connect.getSource().getMaxId())) {
+            throw new IllegalArgumentException("Source MySQL minId can not be null");
+        }
     }
 
     private void check(ConnectConfig config){
         if (!StringUtils.hasLength(config.getUrl())) {
-            throw new IllegalArgumentException("MySQL rul can not be null");
+            throw new IllegalArgumentException("Source or Target MySQL url can not be null");
+        }
+
+        if (!StringUtils.hasLength(config.getTable())) {
+            throw new IllegalArgumentException("Source or Target MySQL table can not be null");
         }
 
         if (!StringUtils.hasLength(config.getDatabase())) {
-            throw new IllegalArgumentException("MySQL database can not be null");
+            throw new IllegalArgumentException("Source or Target MySQL database can not be null");
         }
 
         if (!StringUtils.hasLength(config.getUsername())) {
-            throw new IllegalArgumentException("MySQL username can not be null");
+            throw new IllegalArgumentException("Source or Target MySQL username can not be null");
         }
 
         if (!StringUtils.hasLength(config.getPassword())) {
-            throw new IllegalArgumentException("MySQL password can not be null");
+            throw new IllegalArgumentException("Source or Target MySQL password can not be null");
         }
 
         if (CollectionUtils.isEmpty(config.getFields())) {
-            throw new IllegalArgumentException("MySQL fields can not be null");
+            throw new IllegalArgumentException("Source or Target MySQL fields can not be null");
+        }
+
+        if (config.getBatchSize() <= 0) {
+            throw new IllegalArgumentException("Source or Target MySQL batchSize can not be null");
         }
     }
 }
